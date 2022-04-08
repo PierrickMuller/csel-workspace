@@ -28,5 +28,14 @@
 			"path": "../src/tracing"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.associations": {
+			"module.h": "c",
+			"kernel.h": "c",
+			"list.h": "c",
+			"new": "c",
+			"init.h": "c",
+			"io.h": "c"
+		}
+	}
 }

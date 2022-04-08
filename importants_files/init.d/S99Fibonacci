@@ -1,0 +1,17 @@
+case "$1" in
+	start)
+	/opt/fibonacci 4
+	;;
+	stop)
+	killall /opt/fibonacci
+	;;
+	restart|reload)
+	killall fibonacci
+	/opt/fibonacci 4
+	;;
+	*)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+echo "Application daemon Fibonacci launched"
+exit $?
