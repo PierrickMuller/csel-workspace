@@ -2,3 +2,5 @@ images
 buildroot-images
 src/*/app
 .obj
+src/optimization/exo3/log_files/*
+src/optimization/exo3_corrected/log_files/*
