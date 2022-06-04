@@ -50,7 +50,7 @@
 #define UNUSED(x) (void)(x)
 
 
-const int NB_MESSAGE = 20;
+const int NB_MESSAGE = 5;
 static int signal_catched = 0;
 static cpu_set_t set;
 
@@ -62,20 +62,16 @@ static void printerror(){
 
 static void parent(int socket){
 	char buf[1024];
-	int i;
-	int cpu_nb = 10;
 	while(strcmp(buf,"exit"))
 	{
-		int n = read(socket,buf,sizeof(buf));
-		cpu_nb = sched_getaffinity(0,sizeof(set), &set);
-		printf("Parent (CPU %d) received : %s\n",cpu_nb,buf);
+		read(socket,buf,sizeof(buf));
+		printf("Parent (PID %ld) received : %s\n",(long)getpid(),buf);
 	}
 	
 }
 
 static void child(int socket){
 	int i = 0;
-	int cpu_nb = 10;
 	char msg[50],number[4],result[54];
 	strcpy(msg,"Message number : ");
 	for(i = 0; i < NB_MESSAGE;i++)
@@ -83,8 +79,7 @@ static void child(int socket){
 		strcpy(result,msg);
 		sprintf(number,"%d",i);
 		strcat(result,number);
-		cpu_nb = sched_getaffinity(0,sizeof(set), &set);
-		printf("Child (CPU %d) send : %s\n",cpu_nb,result);
+		printf("Child (PID %ld) send : %s\n",(long)getpid(),result);
 		write(socket,result,sizeof(result));
 		sleep(1);
 	}

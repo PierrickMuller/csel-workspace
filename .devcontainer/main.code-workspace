@@ -36,6 +36,8 @@
 			"new": "c",
 			"init.h": "c",
 			"io.h": "c"
-		}
+		},
+		"codesnap.transparentBackground": true,
+		"codesnap.realLineNumbers": true
 	}
 }

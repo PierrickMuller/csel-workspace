@@ -39,6 +39,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <syslog.h>
 
 
 /*
@@ -181,25 +182,61 @@ static int open_button_k2()
 
 	//unexport
 	int f = open (GPIO_UNEXPORT, O_WRONLY);
+	if (f == -1)
+	{
+		printerror();
+	}
 	write (f, K2, strlen(K2));
-	close(f);
+	int ret = close(f);
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	//export pin to sysfsa
 	f = open(GPIO_EXPORT, O_WRONLY);
+	if (f == -1)
+	{
+		printerror();
+	}
 	write (f, K2, strlen(K2));
-	close (f); 
+	ret = close (f); 
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	//config pin 
 	f = open(GPIO_k2 "/direction",O_WRONLY);
+	if (f == -1)
+	{
+		printerror();
+	}
 	write (f, "in", 3);
-	close(f);
+	ret = close(f);
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	//falling mode
 	f = open(GPIO_k2 "/edge",O_WRONLY);
+	if (f == -1)
+	{
+		printerror();
+	}
 	write (f,"falling",7);
-	close(f);
+	ret = close(f);
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	f = open(GPIO_k2 "/value", O_RDONLY);
+	if(f == -1)
+	{
+		printerror();
+	}
 	return f;
 }
 
@@ -208,26 +245,77 @@ static int open_button_k3()
 
 	//unexport
 	int f = open (GPIO_UNEXPORT, O_WRONLY);
+	if(f == -1)
+	{
+		printerror();
+	}
 	write (f, K3, strlen(K3));
-	close(f);
+	int ret = close(f);
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	//export pin to sysfsa
 	f = open(GPIO_EXPORT, O_WRONLY);
+	if(f == -1)
+	{
+		printerror();
+	}
 	write (f, K3, strlen(K3));
-	close (f); 
+	ret = close (f); 
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	//config pin 
 	f = open(GPIO_k3 "/direction",O_WRONLY);
+	if(f == -1)
+	{
+		printerror();
+	}
 	write (f, "in", 2);
-	close(f);
+	ret = close(f);
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	//falling mode
 	f = open(GPIO_k3 "/edge",O_WRONLY);
+	if(f == -1)
+	{
+		printerror();
+	}
 	write (f,"falling",7);
-	close(f);
+	ret = close(f);
+	if(ret == -1)
+	{
+		printerror();
+	}
 
 	f = open(GPIO_k3 "/value", O_RDONLY);
+	if(f == -1)
+	{
+		printerror();
+	}
 	return f;
+}
+
+
+void set_timer_values(struct itimerspec *ts, struct itimerspec *ts2, long p1, long p2)
+{
+	ts->it_interval.tv_sec = p2 / 1000000000;
+	ts->it_interval.tv_nsec = (p2 % 1000000000);
+	ts->it_value.tv_sec = p2 / 1000000000; // ns to s
+	ts->it_value.tv_nsec = (p2 % 1000000000); // ns
+
+	ts2->it_interval.tv_sec = p1 / 1000000000;
+	ts2->it_interval.tv_nsec = p1 % 1000000000;
+	ts2->it_value.tv_sec = p1 / 1000000000;
+	ts2->it_value.tv_nsec = p1 % 1000000000;	
+
 }
 
 int main(int argc, char* argv[])
@@ -237,6 +325,8 @@ int main(int argc, char* argv[])
 	struct itimerspec ts, ts2;
 	long duty = 2;		// %
 	long period = 500; // ms (2Hz)
+	uint64_t value;
+	int k = 0;
 	if (argc >= 2)
 		period   = atoi (argv[1]);
 	period *= 1000000; // in ns
@@ -257,16 +347,7 @@ int main(int argc, char* argv[])
 	tfd = timerfd_create(CLOCK_MONOTONIC, 0);
 
 	// Initialise first value period timer
-	ts.it_interval.tv_sec = p2 / 1000000000;
-	ts.it_interval.tv_nsec = (p2 % 1000000000);
-	ts.it_value.tv_sec = p2 / 1000000000; // ns to s
-	ts.it_value.tv_nsec = (p2 % 1000000000); // ns
-
-	ts2.it_interval.tv_sec = p1 / 1000000000;
-	ts2.it_interval.tv_nsec = p1 % 1000000000;
-	ts2.it_value.tv_sec = p1 / 1000000000;
-	ts2.it_value.tv_nsec = p1 % 1000000000;	
-	
+	set_timer_values(&ts,&ts2,p1,p2);	
 	timerfd_settime(tfd, 0, &ts, NULL);
 
 	epfd = epoll_create1(0);
@@ -290,13 +371,13 @@ int main(int argc, char* argv[])
 		.data.fd = k3,
 
 	};		
-	struct epoll_event ev = {
+	struct epoll_event ev_tfd = {
 		.events = EPOLLIN,
 		.data.fd = tfd,
 
 	};
 
-	ret = epoll_ctl(epfd, EPOLL_CTL_ADD, tfd, &ev);
+	ret = epoll_ctl(epfd, EPOLL_CTL_ADD, tfd, &ev_tfd);
 	if(ret == -1)
 	{
 		printerror();
@@ -317,12 +398,7 @@ int main(int argc, char* argv[])
 		printerror();
 	}
 
-
-	printf("k1 = %d, k2 = %d, k3 = %d , tfd = %d\n",k1,k2,k3,tfd);
-
-	uint64_t value;
-	int k = 0;
-	
+	openlog("silly_led_control",LOG_CONS | LOG_PID | LOG_NDELAY,LOG_USER);
 	while(1) {
 
 		struct epoll_event events[5];	
@@ -353,55 +429,37 @@ int main(int argc, char* argv[])
 			}
 			if(events[i].data.fd == k1)
 			{
-				read(k1,&value,8);
-				printf("K1 pushed ! \n");
+				read(k1,&value,8);	
+				syslog(LOG_INFO,"Bouton K1, Fréquence augmentée");
 				act_period = act_period / 2;
 				p1 = act_period / 100 * duty;
 				p2 = act_period - p1;
-				ts.it_interval.tv_sec = p2 / 1000000000;// (ts.it_interval.tv_sec + 
-				ts.it_interval.tv_nsec = (p2 % 1000000000);
-				ts.it_value.tv_sec = p2 / 1000000000; // ns to s
-				ts.it_value.tv_nsec = (p2 % 1000000000); // ns
-
-				ts2.it_interval.tv_sec = p1 / 1000000000;
-				ts2.it_interval.tv_nsec = p1 % 1000000000;
-				ts2.it_value.tv_sec = p1 / 1000000000;
-				ts2.it_value.tv_nsec = p1 % 1000000000;	
+				set_timer_values(&ts,&ts2,p1,p2);
+				timerfd_settime(tfd, 0, &ts, NULL);
+				pwrite (led, "0", sizeof("0"), 0);
 			}
 			if(events[i].data.fd == k2)
 			{
 				read(k2,&value,8);
-				printf("K2 pushed ! \n");
+				syslog(LOG_INFO,"Bouton K2, Fréquence restorée");
 				act_period = period;
 				p1 = act_period / 100 * duty;
 				p2 = act_period - p1;
-				ts.it_interval.tv_sec = p2 / 1000000000;// (ts.it_interval.tv_sec + 
-				ts.it_interval.tv_nsec = (p2 % 1000000000);
-				ts.it_value.tv_sec = p2 / 1000000000; // ns to s
-				ts.it_value.tv_nsec = (p2 % 1000000000); // ns
-
-				ts2.it_interval.tv_sec = p1 / 1000000000;
-				ts2.it_interval.tv_nsec = p1 % 1000000000;
-				ts2.it_value.tv_sec = p1 / 1000000000;
-				ts2.it_value.tv_nsec = p1 % 1000000000;
+				set_timer_values(&ts,&ts2,p1,p2);
+				timerfd_settime(tfd, 0, &ts, NULL);
+				pwrite (led, "0", sizeof("0"), 0);
 			}
 			if(events[i].data.fd == k3)
 			{
 
 				read(k3,&value,8);
-				printf("K3 pushed ! \n");
+				syslog(LOG_INFO,"Bouton K3, Fréquence diminuée");
 				act_period = act_period * 2;
 				p1 = act_period / 100 * duty;
 				p2 = act_period - p1;
-				ts.it_interval.tv_sec = p2 / 1000000000;// (ts.it_interval.tv_sec + 
-				ts.it_interval.tv_nsec = (p2 % 1000000000);
-				ts.it_value.tv_sec = p2 / 1000000000; // ns to s
-				ts.it_value.tv_nsec = (p2 % 1000000000); // ns
-
-				ts2.it_interval.tv_sec = p1 / 1000000000;
-				ts2.it_interval.tv_nsec = p1 % 1000000000;
-				ts2.it_value.tv_sec = p1 / 1000000000;
-				ts2.it_value.tv_nsec = p1 % 1000000000;	
+				set_timer_values(&ts,&ts2,p1,p2);
+				timerfd_settime(tfd, 0, &ts, NULL);
+				pwrite (led, "0", sizeof("0"), 0);
 			}
 		}
 
